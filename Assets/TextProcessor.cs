@@ -111,26 +111,29 @@ public class TextProcessor : MonoBehaviour
     public void StartRecording()
     {
         lastPartialResult = ""; // Reset the last partial result on a new recording
-        SpeechRecognizer.StartRecording(true);        
+        SpeechRecognizer.StartRecording(true);
         previewText.text = cumulativeText + speechPrompt;
     }
 
     public void OnPartialResult(string result)
     {
-        if (result.StartsWith(lastPartialResult))
+        if (!result.Equals(lastPartialResult))
         {
-            // Only append the new part of the result
-            string newText = result.Substring(lastPartialResult.Length);
-            cumulativeText += newText;
-            lastPartialResult = result;
-            previewText.text = cumulativeText;
-        }
-        else
-        {
-            // Handle the case where the new partial result doesn't start with the previous partial result (e.g., correction or complete change)
-            cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result;
-            lastPartialResult = result;
-            previewText.text = cumulativeText;
+            if (result.StartsWith(lastPartialResult))
+            {
+                // Only append the new part of the result
+                string newText = result.Substring(lastPartialResult.Length);
+                cumulativeText += newText;
+                lastPartialResult = result;
+                previewText.text = cumulativeText;
+            }
+            else
+            {
+                // Handle the case where the new partial result doesn't start with the previous partial result (e.g., correction or complete change)
+                cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result;
+                lastPartialResult = result;
+                previewText.text = cumulativeText;
+            }
         }
     }
 
