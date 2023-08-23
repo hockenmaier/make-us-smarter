@@ -14,8 +14,10 @@ public class TextProcessor : MonoBehaviour
     public TextMeshProUGUI debugText;
 
     private string cumulativeText = "";
-    private string lastPartialResult = "";
+    private string currentRecording = "";
     private string speechPrompt = "...";
+
+    private float chunkingTime = 7f;
 
     private void Awake()
     {
@@ -31,7 +33,7 @@ public class TextProcessor : MonoBehaviour
     {
         print("Initializing...");
         InitializeRecorder();
-        //StartCoroutine(WaitAndShowStartButton());
+        InvokeRepeating("ChunkText", chunkingTime, chunkingTime);
     }
 
     private void InitializeRecorder()
@@ -54,12 +56,6 @@ public class TextProcessor : MonoBehaviour
             startRecordingButton.gameObject.SetActive(false);
         }
     }
-
-    /*private IEnumerator WaitAndShowStartButton()
-    {
-        yield return new WaitForSeconds(.66f);
-
-    }*/
 
     public void OnStartRecordingPressed()
     {
@@ -85,6 +81,7 @@ public class TextProcessor : MonoBehaviour
         startRecordingButton.gameObject.SetActive(false);
         previewText.gameObject.SetActive(true);
         errorText.gameObject.SetActive(true);
+        errorText.text = "";
         StartRecording();
     }
 
@@ -110,39 +107,29 @@ public class TextProcessor : MonoBehaviour
 
     public void StartRecording()
     {
-        lastPartialResult = ""; // Reset the last partial result on a new recording
+        currentRecording = ""; // Reset current recording text
         SpeechRecognizer.StartRecording(true);
         previewText.text = cumulativeText + speechPrompt;
     }
 
     public void OnPartialResult(string result)
     {
-        if (!result.Equals(lastPartialResult))
-        {
-            if (result.StartsWith(lastPartialResult))
-            {
-                // Only append the new part of the result
-                string newText = result.Substring(lastPartialResult.Length);
-                cumulativeText += newText;
-                lastPartialResult = result;
-                previewText.text = cumulativeText;
-            }
-            else
-            {
-                // Handle the case where the new partial result doesn't start with the previous partial result (e.g., correction or complete change)
-                cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result;
-                lastPartialResult = result;
-                previewText.text = cumulativeText;
-            }
-        }
+        currentRecording = result; // Always update the current recording with the latest partial result
+        previewText.text = cumulativeText + currentRecording + speechPrompt;
     }
 
     public void OnFinalResult(string result)
     {
-        cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result + ". ";
-        lastPartialResult = ""; // Reset the last partial result
-        previewText.text = cumulativeText;
+        cumulativeText += result + ". "; // Append the final result to cumulativeText
+        currentRecording = ""; // Reset current recording
+        previewText.text = cumulativeText + speechPrompt;
         StartRecording();
+    }
+
+    public void ChunkText()
+    {
+        cumulativeText += currentRecording + "| "; // Append the current recording and a bar to delineate chunks
+        currentRecording = ""; // Reset current recording since it's now part of cumulativeText
     }
 
 
