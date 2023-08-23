@@ -14,14 +14,15 @@ public class TextProcessor : MonoBehaviour
     public TextMeshProUGUI debugText;
 
     private string cumulativeText = "";
+    private string lastPartialResult = "";
     private string speechPrompt = "...";
 
     private void Awake()
     {
-        titleText.enabled = true;
-        startRecordingButton.enabled = true;
-        previewText.enabled = false;
-        errorText.enabled = false;
+        titleText.gameObject.SetActive(true);
+        startRecordingButton.gameObject.SetActive(true);
+        previewText.gameObject.SetActive(false);
+        errorText.gameObject.SetActive(false);
         debugText.text = "";
 
     }
@@ -57,7 +58,6 @@ public class TextProcessor : MonoBehaviour
     /*private IEnumerator WaitAndShowStartButton()
     {
         yield return new WaitForSeconds(.66f);
-        startRecordingButton.enabled = true;
 
     }*/
 
@@ -83,13 +83,16 @@ public class TextProcessor : MonoBehaviour
     public void StartRecordingFirst()
     {
         startRecordingButton.gameObject.SetActive(false);
+        previewText.gameObject.SetActive(true);
+        errorText.gameObject.SetActive(true);
         StartRecording();
     }
 
-    public void StartRecording()
+    /*public void StartRecording()
     {
         SpeechRecognizer.StartRecording(true);
-        previewText.enabled = true;
+        previewText.gameObject.SetActive(true);
+        errorText.gameObject.SetActive(true);
         previewText.text = cumulativeText + speechPrompt;
     }
 
@@ -103,8 +106,42 @@ public class TextProcessor : MonoBehaviour
         previewText.text = cumulativeText + result;
         cumulativeText += result + ". ";
         StartRecording();
+    }*/
+
+    public void StartRecording()
+    {
+        lastPartialResult = ""; // Reset the last partial result on a new recording
+        SpeechRecognizer.StartRecording(true);        
+        previewText.text = cumulativeText + speechPrompt;
     }
-    
+
+    public void OnPartialResult(string result)
+    {
+        if (result.StartsWith(lastPartialResult))
+        {
+            // Only append the new part of the result
+            string newText = result.Substring(lastPartialResult.Length);
+            cumulativeText += newText;
+            lastPartialResult = result;
+            previewText.text = cumulativeText;
+        }
+        else
+        {
+            // Handle the case where the new partial result doesn't start with the previous partial result (e.g., correction or complete change)
+            cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result;
+            lastPartialResult = result;
+            previewText.text = cumulativeText;
+        }
+    }
+
+    public void OnFinalResult(string result)
+    {
+        cumulativeText = cumulativeText.Substring(0, cumulativeText.Length - lastPartialResult.Length) + result + ". ";
+        lastPartialResult = ""; // Reset the last partial result
+        previewText.text = cumulativeText;
+        StartRecording();
+    }
+
 
     public void OnAvailabilityChange(bool available)
     {
