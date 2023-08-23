@@ -7,6 +7,7 @@ public class RecordingCanvas : MonoBehaviour
 {
   public Button startRecordingButton;
   public Text resultText;
+    public string cumulativeText = "";
 
   void Start()
   {
@@ -34,13 +35,15 @@ public class RecordingCanvas : MonoBehaviour
   public void OnFinalResult(string result)
   {
     startRecordingButton.GetComponentInChildren<Text>().text = "Start Recording";
-    resultText.text = result;
+    resultText.text = cumulativeText + result;
     startRecordingButton.enabled = true;
+        cumulativeText += result + ". ";
+        StartRecording();
   }
 
   public void OnPartialResult(string result)
   {
-    resultText.text = result;
+    resultText.text = cumulativeText + result; ;
   }
 
   public void OnAvailabilityChange(bool available)
@@ -73,13 +76,15 @@ public class RecordingCanvas : MonoBehaviour
   public void OnEndOfSpeech()
   {
     startRecordingButton.GetComponentInChildren<Text>().text = "Start Recording";
-  }
+        StartRecording();
+    }
 
   public void OnError(string error)
   {
     Debug.LogError(error);
     startRecordingButton.GetComponentInChildren<Text>().text = "Start Recording";
     startRecordingButton.enabled = true;
+        StartRecording();
   }
 
   public void OnStartRecordingPressed()
@@ -97,9 +102,14 @@ public class RecordingCanvas : MonoBehaviour
     }
     else
     {
-      SpeechRecognizer.StartRecording(true);
-      startRecordingButton.GetComponentInChildren<Text>().text = "Stop Recording";
-      resultText.text = "Say something :-)";
+            StartRecording(); 
     }
   }
+
+    public void StartRecording()
+    {
+        SpeechRecognizer.StartRecording(true);
+        startRecordingButton.GetComponentInChildren<Text>().text = "Stop Recording";
+        resultText.text = cumulativeText + "Say something :-)";
+    }
 }
