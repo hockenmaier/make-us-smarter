@@ -26,7 +26,6 @@ public class TextProcessor : MonoBehaviour
         previewText.gameObject.SetActive(false);
         errorText.gameObject.SetActive(false);
         debugText.text = "";
-
     }
 
     void Start()
@@ -34,6 +33,11 @@ public class TextProcessor : MonoBehaviour
         print("Initializing...");
         InitializeRecorder();
         InvokeRepeating("ChunkText", chunkingTime, chunkingTime);
+    }
+
+    private void Update()
+    {
+        WriteLogs();
     }
 
     private void InitializeRecorder()
@@ -60,7 +64,6 @@ public class TextProcessor : MonoBehaviour
     public void OnStartRecordingPressed()
     {
         print("Start Clicked");
-        debugText.text = "starting...";
         if (SpeechRecognizer.IsRecording())
         {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -79,31 +82,12 @@ public class TextProcessor : MonoBehaviour
     public void StartRecordingFirst()
     {
         startRecordingButton.gameObject.SetActive(false);
+        titleText.gameObject.SetActive(false);
         previewText.gameObject.SetActive(true);
         errorText.gameObject.SetActive(true);
         errorText.text = "";
         StartRecording();
     }
-
-    /*public void StartRecording()
-    {
-        SpeechRecognizer.StartRecording(true);
-        previewText.gameObject.SetActive(true);
-        errorText.gameObject.SetActive(true);
-        previewText.text = cumulativeText + speechPrompt;
-    }
-
-    public void OnPartialResult(string result)
-    {
-        previewText.text = cumulativeText + result; ;
-    }
-
-    public void OnFinalResult(string result)
-    {
-        previewText.text = cumulativeText + result;
-        cumulativeText += result + ". ";
-        StartRecording();
-    }*/
 
     public void StartRecording()
     {
@@ -142,7 +126,7 @@ public class TextProcessor : MonoBehaviour
         }
         else
         {
-            previewText.text = speechPrompt;
+            //previewText.text = speechPrompt;
         }
     }
 
@@ -172,5 +156,12 @@ public class TextProcessor : MonoBehaviour
         StartRecording();
     }
 
-    
+    public void OnLogButtonPress()
+    {
+        debugText.enabled = !debugText.enabled;
+    }
+    void WriteLogs()
+    {
+        debugText.text = LogManager.myLog;
+    }
 }
