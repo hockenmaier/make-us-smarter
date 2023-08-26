@@ -15,6 +15,8 @@ public class TextProcessor : MonoBehaviour
 
     private string cumulativeText = "";
     private string currentRecording = "";
+    private string lastChunkEnd = "";
+
     private string speechPrompt = "...";
 
     private float chunkingTime = 7f;
@@ -91,29 +93,35 @@ public class TextProcessor : MonoBehaviour
 
     public void StartRecording()
     {
+        print("starting new recording");
         currentRecording = ""; // Reset current recording text
+        lastChunkEnd = cumulativeText; // Initialize last chunk end to current cumulative text
         SpeechRecognizer.StartRecording(true);
         previewText.text = cumulativeText + speechPrompt;
     }
 
     public void OnPartialResult(string result)
     {
+        print("partial result");
         currentRecording = result; // Always update the current recording with the latest partial result
         previewText.text = cumulativeText + currentRecording + speechPrompt;
     }
 
     public void OnFinalResult(string result)
     {
-        cumulativeText += result + ". "; // Append the final result to cumulativeText
-        currentRecording = ""; // Reset current recording
+        print("final result");
+        cumulativeText += result + " "; // Append the final result to cumulativeText
+        lastChunkEnd = cumulativeText; // Update the last chunk end marker
+        currentRecording = ""; // Reset current recording to ensure no duplicates
         previewText.text = cumulativeText + speechPrompt;
-        StartRecording();
+        StartRecording(); // Restart the recording
     }
 
     public void ChunkText()
     {
-        cumulativeText += currentRecording + "| "; // Append the current recording and a bar to delineate chunks
-        currentRecording = ""; // Reset current recording since it's now part of cumulativeText
+        string newText = cumulativeText.Substring(lastChunkEnd.Length) + currentRecording;
+        cumulativeText += newText + "|"; // Append new text and a bar to delineate chunks
+        lastChunkEnd = cumulativeText; // Update the last chunk end marker
     }
 
 
@@ -152,7 +160,7 @@ public class TextProcessor : MonoBehaviour
     public void OnError(string error)
     {
         errorText.text = error;
-        Debug.LogError(error);
+        //Debug.LogError(error);
         StartRecording();
     }
 
