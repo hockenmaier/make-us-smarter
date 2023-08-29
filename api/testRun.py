@@ -1,4 +1,3 @@
-import json
 from __init__ import Main_Loop as function_main
 
 #Test code for user interaction via terminal

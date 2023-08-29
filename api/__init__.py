@@ -1,3 +1,6 @@
+import sys
+print(sys.executable)
+
 import os
 import logging
 import openai
@@ -66,7 +69,7 @@ def Main_Loop(payload):
     
     return_payload = {
             "user_exit": False,
-            "message": "message text"
+            "message": answerer_response_data['chat_response']
     }
     return return_payload
 
@@ -77,8 +80,8 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     global parser_chat_session
     global answerer_chat_session
 
-    openai.api_version = "" 
-    openai.api_base = ""
+    # openai.api_version = "" 
+    # openai.api_base = ""
     openai.api_key = os.environ["openai_api_key"]
 
     Print_And_Log('Set the following openai parameters: api_type: ' + str(openai.api_type) + ', api_version: ' + str(openai.api_version) + ', api_base: ' + str(openai.api_base) + ', api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
@@ -96,13 +99,17 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     parser_chat_session = None #always clear this; we don't need conversation context for parser
 
     if(parser_function_response != ""):
-        if answerer_chat_session is None:  
-            answerer_chat_session = AnswererChatSession(temperature=temperature)  
-            Print_And_Log('Created a new chat session for answerer')  
-        else:  
-            Print_And_Log('Using existing chat session for answerer')  
+        answerer_response_data['chat_response'] = f"The questions generated are: {parser_response_data['function_response']}"
+
+        #For later:
+
+        # if answerer_chat_session is None:  
+        #     answerer_chat_session = AnswererChatSession(temperature=temperature)  
+        #     Print_And_Log('Created a new chat session for answerer')  
+        # else:  
+        #     Print_And_Log('Using existing chat session for answerer')  
         
-        answerer_chat_session.chat(parser_function_response, answerer_response_data, True)
+        # answerer_chat_session.chat(parser_function_response, answerer_response_data, True)
     else:
         answerer_response_data['chat_response'] = "Couldn't parse any questions or topics"
     
@@ -141,6 +148,20 @@ class ParserChatSession:
             },
             
         ]
+    
+    def get_model_name(self):
+        if self.CurrentAISmartsLevel == AISmartsLevel.gpt3:
+            return GPT3_Models[self.CurrentAIContextLength]
+        elif self.CurrentAISmartsLevel == AISmartsLevel.gpt4:
+            return GPT4_Models[self.CurrentAIContextLength]
+        else:
+            raise ValueError("Invalid smarts level")
+
+    def add_user_message(self, message):
+        if self.history[-1]["role"] == "user":
+            raise ValueError("Cannot add consecutive user messages. An assistant message should follow.")
+        self.history.append({"role": "user", "content": message})
+    
     def chat(self, message, parser_response_data, new_message = True): 
         if(new_message == True):
             self.add_user_message(message)
