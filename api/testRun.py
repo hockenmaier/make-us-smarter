@@ -1,6 +1,7 @@
 from __init__ import Main_Loop as function_main
 
 #Test code for user interaction via terminal
+#and so then I asked.  Layers of the OSI stack.  and you do
 
 def interact(multiline:bool = False):
     while True:

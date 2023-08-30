@@ -35,14 +35,14 @@ class GPT4Lengths(IntEnum):
     long = 3
 
 GPT3_Models = {
-    GPT3Lengths.short: 'gpt-35-turbo',
-    GPT3Lengths.medium: 'gpt-35-turbo-16K', #Comment this out to test context limit reached 'gpt-35-turbo-16K'
+    GPT3Lengths.short: 'gpt-3.5-turbo',
+    GPT3Lengths.medium: 'gpt-3.5-turbo-16k', #Comment this out to test context limit reached 'gpt-35-turbo-16K'
     # Add more as needed
 }
 
 GPT4_Models = {
     GPT4Lengths.short: 'gpt-4',
-    GPT4Lengths.medium: 'gpt-4-32K',
+    # GPT4Lengths.medium: 'gpt-4-32K',
     # Add more as needed
 }
 
@@ -81,7 +81,7 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     global answerer_chat_session
 
     # openai.api_version = "" 
-    # openai.api_base = ""
+    #openai.api_base = ""
     openai.api_key = os.environ["openai_api_key"]
 
     Print_And_Log('Set the following openai parameters: api_type: ' + str(openai.api_type) + ', api_version: ' + str(openai.api_version) + ', api_base: ' + str(openai.api_base) + ', api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
@@ -99,7 +99,7 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     parser_chat_session = None #always clear this; we don't need conversation context for parser
 
     if(parser_function_response != ""):
-        answerer_response_data['chat_response'] = f"The questions generated are: {parser_response_data['function_response']}"
+        answerer_response_data['chat_response'] = f"Parser Output:{parser_response_data['function_response']}"
 
         #For later:
 
@@ -116,8 +116,8 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     return
 
 class ParserChatSession:
-    history = [{"role": "system", "content": parser_system_message}]  # Moved history to a class variable 
-    CurrentAISmartsLevel = AISmartsLevel.gpt3
+    history = [{"role": "system", "content": parser_system_message}]
+    CurrentAISmartsLevel = AISmartsLevel.gpt4
     CurrentAIContextLength = GPT3Lengths.short
     
     def __init__(self, initial_system_message=parser_system_message, temperature=0.5): 
@@ -130,23 +130,24 @@ class ParserChatSession:
             #TODO: include confidence levels
             
             {
-            "name": "parse_questions_and_topics",
-            "description": "Return the questions and topics the conversation snippet might be about",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "questions": {
-                        "type": "string",
-                        "description": "questions relevant to the conversation",
-                    },
-                    "topics": {
-                        "type": "string",
-                        "description": "topics the conversation is about",
+                "name": "parse_questions_and_topics",
+                "description": "Return the questions and topics the conversation snippet might be about",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "questions": {
+                            "type": "array",  # Changed to array
+                            "description": "questions relevant to the conversation, formatted with proper grammar ending in '?'",
+                            "items": {"type": "string"}
+                        },
+                        "topics": {
+                            "type": "array",  # Changed to array
+                            "description": "topics the conversation is about, 3 word max",
+                            "items": {"type": "string"}
+                        }
                     }
                 }
-            }
-            },
-            
+            },            
         ]
     
     def get_model_name(self):
@@ -166,13 +167,14 @@ class ParserChatSession:
         if(new_message == True):
             self.add_user_message(message)
         Print_And_Log('Chatting OpenAI with engine: ' + self.get_model_name() + ' and new message: ' + str(message))
-        max_retries = 8
+        max_retries = 2
         retry_wait_time = 12
 
         for attempt in range(max_retries):
             try:
+                
                 response = openai.ChatCompletion.create(
-                    engine=self.get_model_name(),
+                    model=self.get_model_name(),
                     messages=self.history,
                     functions= self.functions,
                     function_call="auto",
@@ -218,6 +220,28 @@ class ParserChatSession:
             if function_name == "parse_questions_and_topics":
                 print(f"💭 The snippet seems to have questions or topics")
                 #TODO: format questions and topics into parser_response_data['function_response']
+                questions = arguments_json.get('questions', [])
+                topics = arguments_json.get('topics', [])
+                
+                num_questions = len(questions)
+                num_topics = len(topics)
+                
+                formatted_questions = f"{num_questions} questions generated: {', '.join(questions)}" if questions else 'No questions identified.'
+                formatted_topics = f"{num_topics} topics identified: {', '.join(topics)}" if topics else 'No topics identified.'
+        
+                parser_response_data['function_response'] = f"{formatted_questions}\n{formatted_topics}"
+            # if function_name == "dump_message_history":
+            #     print(f"💭 The user asked me to export our current message history")
+            #     filename = datetime.now().strftime("message_exports/Kevin_the_minion_message_history_%Y%m%d_%H%M%S.json")
+
+            #     with open(filename, 'w') as file:
+            #         json.dump(self.history, file, indent=4)
+
+            #     print(f"File {filename} has been created and written to.")
+
+            #     generated_message= 'I\'ve dumped message history to the file: ' + filename
+            #     self.history.append({"role": "assistant", "content": generated_message})
+            #     parser_response_data['chat_response'] = generated_message
 
         else:            
             generated_message = openAI_response['choices'][0]['message']['content']
@@ -287,7 +311,7 @@ class AnswererChatSession:
         for attempt in range(max_retries):
             try:
                 response = openai.ChatCompletion.create(
-                    engine=self.get_model_name(),
+                    model=self.get_model_name(),
                     messages=self.history,
                     functions= self.functions,
                     function_call="auto",
