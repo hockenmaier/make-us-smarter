@@ -7,7 +7,6 @@ import time
 import json
 from datetime import datetime
 from enum import IntEnum
-from concurrent.futures import ThreadPoolExecutor
 
 # region test code and Entry Point
 
@@ -77,32 +76,6 @@ simulated_parser_response = {
         "completion_tokens": 39,
         "total_tokens": 288
     }
-}
-
-simulated_parser_multiple_questions_response = {
-  "id": "chatcmpl-7vCMG4XR98kETpWbncvUPTpGUP25U",
-  "object": "chat.completion",
-  "created": 1693866556,
-  "model": "gpt-3.5-turbo-0613",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": None,
-        "function_call": {
-          "name": "parse_questions_and_topics",
-          "arguments": "{\n  \"questions\": [\"What is the difference between struct and class in C?\", \"What are the layers of the OSI stack?\"]\n}"
-        }
-      },
-      "finish_reason": "function_call"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 251,
-    "completion_tokens": 30,
-    "total_tokens": 281
-  }
 }
 
 simulated_answerer_response = {
@@ -225,34 +198,15 @@ def Call_LLMs_Series(prompt: str, temperature: float, top_level_response_data: d
         else:  
             Print_And_Log('Using existing chat session for answerer')  
 
-        #This runs in serial:
-
-        # # Send each question to answerer_chat_session.chat and format the response.
-        # for question in parser_response_data['questions']:
-        #     answerer_response_data = {"chat_response": "", "function_response": "", "user_exit": False}
-        #     answerer_chat_session.chat(question, answerer_response_data, True)
-
-        #     # Append the question and its corresponding answer to the list.
-        #     top_level_response_data['qna_pairs'].append({"question": question, "answer": answerer_response_data['chat_response']})
-
-        #This runs in parallel:
-
-        # Function to call the answerer
-        def call_answerer(question):
+        # Send each question to answerer_chat_session.chat and format the response.
+        for question in parser_response_data['questions']:
             answerer_response_data = {"chat_response": "", "function_response": "", "user_exit": False}
             answerer_chat_session.chat(question, answerer_response_data, True)
-            return {"question": question, "answer": answerer_response_data['chat_response']}
 
-        # Parallelize the answerer function calls
-        questions = parser_response_data['questions']
-        with ThreadPoolExecutor() as executor:
-            qna_pairs = list(executor.map(call_answerer, questions))
-            
-        top_level_response_data['qna_pairs'].extend(qna_pairs)
+            # Append the question and its corresponding answer to the list.
+            top_level_response_data['qna_pairs'].append({"question": question, "answer": answerer_response_data['chat_response']})
 
-        # TODO Rebuild the conversation history with question (user) and answer (assistant) pairs that happened in parallel.
-
-        # Respond the QnA was successful:
+        # Combine all the formatted answers into one string and append to top_level_response_data['chat_response'].
         top_level_response_data['chat_response'] += "\n" + "Successful QnA Return"
 
     else:
@@ -323,7 +277,7 @@ class ParserChatSession:
             try:
                 
                 if use_test_data:
-                    response = simulated_parser_multiple_questions_response
+                    response = simulated_parser_response
                     pass
                 else:
                     response = openai.ChatCompletion.create(
@@ -334,7 +288,7 @@ class ParserChatSession:
                         temperature=self.temperature
                     )
                 Print_And_Log('OpenAI responded successfully')   
-                Print_And_Log(response)            
+                            
                 self.parse_functions(response, parser_response_data)
                 return
             except openai.error.RateLimitError as e:
@@ -426,17 +380,13 @@ class AnswererChatSession:
     def add_user_message(self, message):
         Print_And_Log("ADDING ANSWERER USER MESSAGE: " + message)
         if self.history[-1]["role"] == "user":
-            #raise ValueError("Cannot add consecutive user messages. An assistant message should follow.")
-            self.history = self.history[:-1]
-            pass
+            raise ValueError("Cannot add consecutive user messages. An assistant message should follow.")
         self.history.append({"role": "user", "content": message})
 
     def add_assistant_message(self, message):
         Print_And_Log("ADDING ANSWERER ASSISTANT MESSAGE: " + message)
         if self.history[-1]["role"] == "assistant":
-            #raise ValueError("Cannot add consecutive assistant messages. A user message should follow.")
-            self.history = self.history[:-1]
-            pass
+            raise ValueError("Cannot add consecutive assistant messages. A user message should follow.")
         self.history.append({"role": "assistant", "content": message})
 
     def trim_history(self):
