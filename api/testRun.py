@@ -1,7 +1,9 @@
-from __init__ import Main_Loop as function_main
+from __init__ import Main_Loop
 
 #Test code for user interaction via terminal
-#and so then I asked.  Layers of the OSI stack.  and you do
+#and so then I asked.  Layers of the OSI stack.  and you do 
+#and so then I asked.  Layers of the OSI stack.  I think I know some networking.  Will there be a test on
+# me about difference between a struct and class in C.  And the layers of the OSI stack. Can we
 
 def interact(multiline:bool = False):
     while True:
@@ -28,10 +30,11 @@ def interact(multiline:bool = False):
         
         # Send messages to main function
         payload = {
-            "text_snippet": user_input
+            "text_snippet": user_input,
+            "use_test_data": False
         }
 
-        response = function_main(payload)
+        response = Main_Loop(payload)
 
         if response['user_exit'] == True:
             print(f"Ending Conversation!")

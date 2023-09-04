@@ -1,104 +1,24 @@
 import sys
 print(sys.executable)
+
 import os
 import logging
+import openai
 from  importlib.metadata import version
-import importlib
 import time
 import json
 from datetime import datetime
 from enum import IntEnum
 
-def Test_Entry_For_Eve():
-    payload = {
-            "text_snippet": "me about difference between a struct and class in C.  And the layers of the OSI stack. Can we",
-            "use_test_data": True
-    }
-    Main_Loop(payload)
+try:
+    # Cloud syntax
+    from prompt_strings import parser_system_message
+    from prompt_strings import answerer_system_message
 
-global use_test_data
-use_test_data = False  # Set this to False when running in production, True for chatGPT
-
-class DummyOpenAI:
-    def __getattr__(self, name):
-        def method(*args, **kwargs):
-            print(f"Called dummy method: {name}")
-        return method
-    
-global openai
-openai = DummyOpenAI()
-
-# region System Messages
-
-parser_system_message = """
-You are a conversation augmentation intelligence.  You listen to conversations between multiple participants, then try to peice out questions they are asking as well as topics of interest.
-
-You will recieve snippets of text that have been transcribed from conversations.  
-Sometimes this text will be broken or mis-transcribed, so when interpretting this text, consider similar-sounding and rhyming words instead of the words at hand if something doesn't quite make sense.
-You will always respond with function calls, instead of assistant messages.  One call is for questions raised, another is for topics of interest.
-
-"""
-
-answerer_system_message = """
-You are a conversation augmentation intelligence.  You are working in tandem with another intelligence that is parsing out questions from conversations it's listening to.
-
-When you receive a question, your job is to answer it as concisely as possible.  Try to answer in one sentence if possible.  Participants in the conversation will briefly see each of your answers and need to react to them quickly.
-
-Always start with the most pertinent part of the answer.
-"""
-
-# endregion System Messages
-# region Simulated Responses
-
-simulated_parser_response = {
-    "id": "chatcmpl-7v8hzDuKxnRDGA4loSPuQn7XqFCB7",
-    "object": "chat.completion",
-    "created": 1693852527,
-    "model": "gpt-3.5-turbo-0613",
-    "choices": [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "function_call": {
-                    "name": "parse_questions_and_topics",
-                    "arguments": "{\n  \"questions\": [\"What is the difference between a struct and class in C?\"],\n  \"topics\": [\"Layers of the OSI stack\"]\n}"
-                }
-            },
-            "finish_reason": "function_call"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": 249,
-        "completion_tokens": 39,
-        "total_tokens": 288
-    }
-}
-
-simulated_answerer_response = {
-  "id": "chatcmpl-7v8m8zbQZWfOR7bKoOXOa4nyDuXpl",
-  "object": "chat.completion",
-  "created": 1693852784,
-  "model": "gpt-3.5-turbo-0613",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "The main difference between a struct and a class in C is that a struct has all its members public by default, while a class has all its members private by default."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 113,
-    "completion_tokens": 34,
-    "total_tokens": 147
-  }
-}
-
-# endregion Simulated Responses
+except ImportError:
+    # Local syntax
+    from .prompt_strings import parser_system_message
+    from .prompt_strings import answerer_system_message
 
 class AISmartsLevel(IntEnum):
     gpt3 = 1
@@ -126,37 +46,34 @@ GPT4_Models = {
     # Add more as needed
 }
 
+
 def Print_And_Log(message: str):
         logging.info(message)
         print(message)
 
 def Main_Loop(payload):
     Print_And_Log(f"starting main loop with snippet: {payload['text_snippet']}")
-    global use_test_data
-    use_test_data = payload['use_test_data']
-    if not use_test_data:
-        global openai
-        openai = importlib.import_module('openai')
-        version_openai = version('openai')
-        Print_And_Log('Openai version: ' + version_openai)
+
+    version_openai = version('openai')
+    Print_And_Log('Openai version: ' + version_openai)
 
     temperature = 0.5  # default value
-    top_level_response_data = {}
-    top_level_response_data['chat_response'] = ""
-    top_level_response_data['function_response'] = ""
-    top_level_response_data['qna_pairs'] = []
-    top_level_response_data['user_exit'] = False
+    answerer_response_data = {}
+    answerer_response_data['chat_response'] = ""
+    answerer_response_data['function_response'] = ""
+    answerer_response_data['qna_pairs'] = []
+    answerer_response_data['user_exit'] = False
 
-    Call_LLMs_Series(payload['text_snippet'], temperature, top_level_response_data)
+    Call_LLMs_Series(payload['text_snippet'], temperature, answerer_response_data)
     # return func.HttpResponse(f"{responseText}")
     headers = {"Content-Type": "application/json"}
     
-    Print_And_Log(top_level_response_data['qna_pairs'])
+    Print_And_Log(answerer_response_data['qna_pairs'])
 
     return_payload = {
             "user_exit": False,
-            "message": top_level_response_data['chat_response'],
-            "qna_pairs": top_level_response_data['qna_pairs']
+            "message": answerer_response_data['chat_response'],
+            "qna_pairs": answerer_response_data['qna_pairs']
     }
     return return_payload
 
@@ -167,10 +84,11 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
     global parser_chat_session
     global answerer_chat_session
 
-    if use_test_data == False:
-        Print_And_Log("use_test_data is set to False and we are starting to actually use openai")
-        openai.api_key = os.environ["openai_api_key"]
-        Print_And_Log('Set the following openai parameters: api_type: ' + str(openai.api_type) + ', api_version: ' + str(openai.api_version) + ', api_base: ' + str(openai.api_base) + ', api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+    # openai.api_version = "" 
+    #openai.api_base = ""
+    openai.api_key = os.environ["openai_api_key"]
+
+    Print_And_Log('Set the following openai parameters: api_type: ' + str(openai.api_type) + ', api_version: ' + str(openai.api_version) + ', api_base: ' + str(openai.api_base) + ', api_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
 
     parser_chat_session = ParserChatSession(temperature=temperature)  
     Print_And_Log('Created a new chat session for parser')    
@@ -227,7 +145,9 @@ def Call_LLMs_Series(prompt: str, temperature: float, answerer_response_data: di
 
 #      |                                                                                                                                                   |
 #      |------------------------------------------------------------------| PARSER CHAT |------------------------------------------------------------------|
-#      |                                                                                                                                                   | 
+#      |                                                                                                                                                   |
+
+ 
                                            
 class ParserChatSession:
     history = [{"role": "system", "content": parser_system_message}]
@@ -287,19 +207,14 @@ class ParserChatSession:
         for attempt in range(max_retries):
             try:
                 
-                if use_test_data:
-                    response = simulated_parser_response
-                    pass
-                else:
-                    response = openai.ChatCompletion.create(
-                        model=self.get_model_name(),
-                        messages=self.history,
-                        functions= self.functions,
-                        function_call="auto",
-                        temperature=self.temperature
-                    )
-                Print_And_Log('OpenAI responded successfully')   
-                            
+                response = openai.ChatCompletion.create(
+                    model=self.get_model_name(),
+                    messages=self.history,
+                    functions= self.functions,
+                    function_call="auto",
+                    temperature=self.temperature
+                )
+                Print_And_Log('OpenAI responded successfully')                
                 self.parse_functions(response, parser_response_data)
                 return
             except openai.error.RateLimitError as e:
@@ -424,19 +339,14 @@ class AnswererChatSession:
 
         for attempt in range(max_retries):
             try:
-                if use_test_data:
-                    response = simulated_parser_response
-                    pass
-                else:
-                    response = openai.ChatCompletion.create(
-                        model=self.get_model_name(),
-                        messages=self.history,
-                        # functions= self.functions,
-                        # function_call="auto",
-                        temperature=self.temperature
-                    )
-                Print_And_Log('OpenAI responded successfully')
-                Print_And_Log(response)           
+                response = openai.ChatCompletion.create(
+                    model=self.get_model_name(),
+                    messages=self.history,
+                    # functions= self.functions,
+                    # function_call="auto",
+                    temperature=self.temperature
+                )
+                Print_And_Log('OpenAI responded successfully')                
                 self.parse_functions(response, answerer_response_data)
                 return
             except openai.error.RateLimitError as e:
@@ -482,7 +392,3 @@ class AnswererChatSession:
             response_data['chat_response'] = generated_message
 
         return
-    
-
-if __name__ == "__main__":
-    Test_Entry_For_Eve()
