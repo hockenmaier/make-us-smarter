@@ -1,5 +1,2 @@
 openai==0.27.0
-importlib==1.0.4
-concurrent.futures==3.1.0
 json5==0.9.6
-enum34==1.1.10
