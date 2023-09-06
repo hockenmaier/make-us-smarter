@@ -9,7 +9,19 @@ from datetime import datetime
 from enum import IntEnum
 from concurrent.futures import ThreadPoolExecutor
 
-# region test code and Entry Point
+# region test code and Entry Points
+def lambda_handler(event, context):
+    # Extract payload from the event object
+    payload = event.get('payload', {})
+    
+    # Call the Main_Loop function and get the return payload
+    return_payload = Main_Loop(payload)
+    
+    # Return the payload
+    return {
+        'statusCode': 200,
+        'body': json.dumps(return_payload)
+    }
 
 def Test_Entry_For_Eve():
     payload = {
@@ -164,7 +176,7 @@ def Print_And_Log(message: str):
 def Main_Loop(payload):
     Print_And_Log(f"starting main loop with snippet: {payload['text_snippet']}")
     global use_test_data
-    use_test_data = payload['use_test_data']
+    use_test_data = payload.get('use_test_data', False)
     if not use_test_data:
         global openai
         openai = importlib.import_module('openai')
