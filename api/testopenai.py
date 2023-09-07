@@ -28,24 +28,28 @@ def testEndpoint():
     url = 'https://kbr1ahdla6.execute-api.us-west-2.amazonaws.com/snippet'
     payload = {
         "payload": {
-            "text_snippet": "...",
-            "use_test_data": True
+            "text_snippet": "the area under a curve.  Is called what.  I don't know what it",
+            "use_test_data": False
         }
     }
     headers = {'Content-Type': 'application/json'}
 
     response = requests.post(url, data=json.dumps(payload), headers=headers)
     print(response.json())
-
+    response_json = response.json()  # Parse JSON response
+    user_exit_value = response_json.get('user_exit', None)  # Extract 'user_exit' value
     # Get the response text or JSON
     print(response.status_code)
-    return response.text
+    print(f"User Exit: {response_json.get('user_exit', None)}")
+    print(f"Message: {response_json.get('message', None)}")
+    print(f"Question Answer Pairs: {response_json.get('qna_pairs', None)}")
+    return
 
 
 if __name__ == "__main__":
-    for(i) in range(0, 10):
+    for(i) in range(0, 4):
          print("")
     print("Test Generic OpenAI Call")
     #print(main())
     #print(chat())
-    print(testEndpoint())
+    testEndpoint()
