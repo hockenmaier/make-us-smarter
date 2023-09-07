@@ -19,13 +19,14 @@ jobs:
         python-version: 3.8
 
     - name: Install dependencies
-      run: pip install -r api/requirements.txt
+      run: |
+        cd api
+        pip install -r requirements.txt -t .
 
     - name: Package Lambda function
       run: |
         cd api
         zip -r ../parse_and_answer_openai.zip .
-        cd ..
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
