@@ -1,5 +1,7 @@
 import os
 import openai
+import requests
+import json
 
 openai.api_key = os.environ["openai_api_key"]
 
@@ -21,9 +23,29 @@ def chat():
 
     return response
 
+def testEndpoint():
+
+    url = 'https://kbr1ahdla6.execute-api.us-west-2.amazonaws.com/snippet'
+    payload = {
+        "payload": {
+            "text_snippet": "...",
+            "use_test_data": True
+        }
+    }
+    headers = {'Content-Type': 'application/json'}
+
+    response = requests.post(url, data=json.dumps(payload), headers=headers)
+    print(response.json())
+
+    # Get the response text or JSON
+    print(response.status_code)
+    return response.text
+
+
 if __name__ == "__main__":
     for(i) in range(0, 10):
          print("")
     print("Test Generic OpenAI Call")
     #print(main())
-    print(chat())
+    #print(chat())
+    print(testEndpoint())

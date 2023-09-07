@@ -1,0 +1,38 @@
+openapi: "3.0.1"
+info:
+  title: "MakeUsSmarter"
+  version: "2023-09-07 03:39:03UTC"
+servers:
+- url: "https://kbr1ahdla6.execute-api.us-west-2.amazonaws.com/{basePath}"
+  variables:
+    basePath:
+      default: ""
+paths:
+  /parse_and_answer_openai:
+    x-amazon-apigateway-any-method:
+      responses:
+        default:
+          description: "Default response for ANY /parse_and_answer_openai"
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:009241727190:function:parse_and_answer_openai/invocations"
+        connectionType: "INTERNET"
+  /:
+    get:
+      responses:
+        default:
+          description: "Default response for GET /"
+  /snippet:
+    post:
+      responses:
+        default:
+          description: "Default response for POST /snippet"
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "2.0"
+        type: "aws_proxy"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:009241727190:function:parse_and_answer_openai/invocations"
+        connectionType: "INTERNET"
+x-amazon-apigateway-importexport-version: "1.0"

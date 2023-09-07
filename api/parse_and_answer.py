@@ -11,8 +11,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 # region test code and Entry Points
 def lambda_handler(event, context):
-    # Extract payload from the event object
-    payload = event.get('payload', {})
+     # Extract and parse 'body' from the event object
+    body = json.loads(event.get('body', '{}'))
+
+    # Extract payload from the parsed body
+    payload = body.get('payload', {})
     
     # Call the Main_Loop function and get the return payload
     return_payload = Main_Loop(payload)
