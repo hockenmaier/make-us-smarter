@@ -27,10 +27,15 @@ def lambda_handler(event, context):
     }
 
 def Test_Entry_For_Eve():
+    # payload = {
+    #         "text_snippet": "me about difference between a struct and class in C.  And the layers of the OSI stack. Can we",
+    #         "use_test_data": True
+    # }
     payload = {
-            "text_snippet": "me about difference between a struct and class in C.  And the layers of the OSI stack. Can we",
-            "use_test_data": True
+            "text_snippet": "me about difference between a struct and class in C. Layers of the OSI stack. Can we move on",
+            "use_test_data": False
     }
+    Main_Loop(payload)
     Main_Loop(payload)
 
 global use_test_data
@@ -62,41 +67,17 @@ You are a conversation augmentation intelligence.  You are working in tandem wit
 When you receive a question, your job is to answer it as concisely as possible.  Try to answer in one sentence if possible.  Participants in the conversation will briefly see each of your answers and need to react to them quickly.
 
 Always start with the most pertinent part of the answer.
+
+If you recieve a duplicate question, call the function.
 """
 
 # endregion System Messages
 # region Simulated Responses
 
 simulated_parser_response = {
-    "id": "chatcmpl-7v8hzDuKxnRDGA4loSPuQn7XqFCB7",
-    "object": "chat.completion",
-    "created": 1693852527,
-    "model": "gpt-3.5-turbo-0613",
-    "choices": [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "function_call": {
-                    "name": "parse_questions_and_topics",
-                    "arguments": "{\n  \"questions\": [\"What is the difference between a struct and class in C?\"],\n  \"topics\": [\"Layers of the OSI stack\"]\n}"
-                }
-            },
-            "finish_reason": "function_call"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": 249,
-        "completion_tokens": 39,
-        "total_tokens": 288
-    }
-}
-
-simulated_parser_multiple_questions_response = {
-  "id": "chatcmpl-7vCMG4XR98kETpWbncvUPTpGUP25U",
+  "id": "chatcmpl-7wgMSpBl78OIncw91KbgygcNgHB8T",
   "object": "chat.completion",
-  "created": 1693866556,
+  "created": 1694220216,
   "model": "gpt-3.5-turbo-0613",
   "choices": [
     {
@@ -106,16 +87,42 @@ simulated_parser_multiple_questions_response = {
         "content": None,
         "function_call": {
           "name": "parse_questions_and_topics",
-          "arguments": "{\n  \"questions\": [\"What is the difference between struct and class in C?\", \"What are the layers of the OSI stack?\"]\n}"
+          "arguments": "{\n  \"questions\": [\n    {\n      \"question\": \"What is the difference between a struct and a class in C?\",\n      \"confidence\": 5\n    }\n  ],\n  \"topics\": [\n    {\n      \"topic\": \"OSI stack layers\",\n      \"confidence\": 4\n    }\n  ]\n}"
         }
       },
-      "finish_reason": "function_call"
+      "finish_reason": "stop"
     }
   ],
   "usage": {
-    "prompt_tokens": 251,
-    "completion_tokens": 30,
-    "total_tokens": 281
+    "prompt_tokens": 300,
+    "completion_tokens": 66,
+    "total_tokens": 366
+  }
+}
+
+simulated_parser_multiple_questions_response = {
+  "id": "chatcmpl-7wgMSpBl78OIncw91KbgygcNgHB8T",
+  "object": "chat.completion",
+  "created": 1694220216,
+  "model": "gpt-3.5-turbo-0613",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": None,
+        "function_call": {
+          "name": "parse_questions_and_topics",
+          "arguments": "{\n  \"questions\": [\n    {\n      \"question\": \"What is the difference between a struct and a class in C?\",\n      \"confidence\": 5\n    }\n  ],\n  \"topics\": [\n    {\n      \"topic\": \"OSI stack layers\",\n      \"confidence\": 4\n    }\n  ]\n}"
+        }
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 300,
+    "completion_tokens": 66,
+    "total_tokens": 366
   }
 }
 
@@ -196,7 +203,7 @@ def Main_Loop(payload):
     # return func.HttpResponse(f"{responseText}")
     headers = {"Content-Type": "application/json"}
     
-    Print_And_Log(top_level_response_data['qna_pairs'])
+    Print_And_Log(f"Final list of question answer pairs: {top_level_response_data['qna_pairs']}")
 
     return_payload = {
             "user_exit": False,
@@ -241,18 +248,21 @@ def Call_LLMs_Series(prompt: str, temperature: float, top_level_response_data: d
 
         #This runs in parallel:
 
-        # Filter out questions with confidence score <= 2
-        high_confidence_questions = [q['question'] for q in parser_response_data['questions'] if q['confidence'] > 2]
+        # Filter out questions with confidence score <= 3
+        high_confidence_questions = [q['question'] for q in parser_response_data['questions'] if q['confidence'] > 3]
 
         # Function to call the answerer
         def call_answerer(question):
             answerer_response_data = {"chat_response": "", "function_response": "", "user_exit": False}
             answerer_chat_session.chat(question, answerer_response_data, True)
-            return {"question": question, "answer": answerer_response_data['chat_response']}
+            if answerer_response_data['chat_response'] != "":
+                return {"question": question, "answer": answerer_response_data['chat_response']}
+            else:
+                return None
 
         # Parallelize the answerer function calls with high-confidence questions
         with ThreadPoolExecutor() as executor:
-            qna_pairs = list(executor.map(call_answerer, high_confidence_questions))
+            qna_pairs = list(filter(None, executor.map(call_answerer, high_confidence_questions)))
             
         # Extend the qna_pairs only with high-confidence questions and answers
         top_level_response_data['qna_pairs'].extend(qna_pairs)
@@ -299,18 +309,20 @@ class ParserChatSession:
                                 "properties": {
                                     "question": {"type": "string"},
                                     "confidence": {"type": "number"}
-                                }
-                                }
-                            },
-                            "topics": {
-                                "type": "array",
-                                "description": "Topics the conversation is about, 3-word max.",
-                                "items": {
+                                },
+                                "required": ["question", "confidence"],
+                            }
+                        },
+                        "topics": {
+                            "type": "array",
+                            "description": "Topics the conversation is about, 3-word max.",
+                            "items": {
                                 "type": "object",
                                 "properties": {
                                     "topic": {"type": "string"},
                                     "confidence": {"type": "number"}
-                                }
+                                },
+                                "required": ["topic", "confidence"],
                             }
                         }
                     }
@@ -340,24 +352,22 @@ class ParserChatSession:
         retry_wait_time = 12
 
         for attempt in range(max_retries):
-            
-            if use_test_data:
-                response = simulated_parser_multiple_questions_response
-                pass
-            else:
-                response = openai.ChatCompletion.create(
-                    model=self.get_model_name(),
-                    messages=self.history,
-                    functions= self.functions,
-                    function_call="always",
-                    temperature=self.temperature
-                )
-            Print_And_Log('OpenAI responded successfully')   
-            Print_And_Log(response)            
-            self.parse_functions(response, parser_response_data)
-            return
             try:
-                pass
+                if use_test_data:
+                    response = simulated_parser_multiple_questions_response
+                    pass
+                else:
+                    response = openai.ChatCompletion.create(
+                        model=self.get_model_name(),
+                        messages=self.history,
+                        functions= self.functions,
+                        function_call={"name": "parse_questions_and_topics"},
+                        temperature=self.temperature
+                    )
+                Print_And_Log('OpenAI responded successfully')   
+                Print_And_Log(response)            
+                self.parse_functions(response, parser_response_data)
+                return
                 
             except openai.error.RateLimitError as e:
                 Print_And_Log(f"RateLimitError: {e}")
@@ -382,48 +392,42 @@ class ParserChatSession:
         #print('Got a response from OpenAI: ' + str(openAI_response) + '')
         
         try:  #Sometimes responses are improperly formatted, so we catch that here and tell the LLM instead of failing
-            finish_reason = openAI_response['choices'][0]['finish_reason']
-            if finish_reason == "function_call":
-                function_name = openAI_response['choices'][0]['message']['function_call']['name']
-                arguments_str = openAI_response['choices'][0]['message']['function_call']['arguments']
-                arguments_json = json.loads(arguments_str)
+            # finish_reason = openAI_response['choices'][0]['finish_reason']
+            # The response should always be a Function call:
+            function_name = openAI_response['choices'][0]['message']['function_call']['name']
+            arguments_str = openAI_response['choices'][0]['message']['function_call']['arguments']
+            arguments_json = json.loads(arguments_str)
         except:
             generated_message = f"The function call was improperly formatted.  Please try again."  
             self.history.append({"role": "function","name": function_name, "content": generated_message})
             parser_response_data['function_response'] += generated_message
+            return
 
-        if finish_reason == "function_call":
-            if function_name == "parse_questions_and_topics":
-                print(f"💭 The snippet seems to have questions or topics")
-                #TODO: format questions and topics into parser_response_data['function_response']
-                questions = arguments_json.get('questions', [])
-                topics = arguments_json.get('topics', [])
-                
-                num_questions = len(questions)
-                num_topics = len(topics)
-                
-                print(type(questions))
-                print(questions)
-
-                 # Formatting questions with their confidence scores
-                formatted_questions_list = [f"{q['question']} (Confidence: {q['confidence']})" for q in questions]
-                formatted_questions = f"{num_questions} questions generated: {', '.join(formatted_questions_list)}" if questions else 'No questions identified.'
-
-                print(formatted_questions_list)
-                
-                # Formatting topics with their confidence scores
-                formatted_topics_list = [f"{t['topic']} (Confidence: {t['confidence']})" for t in topics]
-                formatted_topics = f"{num_topics} topics identified: {', '.join(formatted_topics_list)}" if topics else 'No topics identified.'
-                
-                if questions:
-                    parser_response_data['questions'] = questions
+        print(f"💭 The snippet seems to have questions or topics")
+        #TODO: format questions and topics into parser_response_data['function_response']
+        questions = arguments_json.get('questions', [])
+        topics = arguments_json.get('topics', [])
         
-                parser_response_data['function_response'] = f"{formatted_questions}\n{formatted_topics}"
+        num_questions = len(questions)
+        num_topics = len(topics)
+        
+        print(type(questions))
+        print(questions)
 
-        else:            
-            generated_message = openAI_response['choices'][0]['message']['content']
-            self.history.append({"role": "assistant", "content": generated_message})
-            parser_response_data['chat_response'] = generated_message
+        # Formatting questions with their confidence scores
+        formatted_questions_list = [f"{q['question']} (Confidence: {q['confidence']})" for q in questions]
+        formatted_questions = f"{num_questions} questions generated: {', '.join(formatted_questions_list)}" if questions else 'No questions identified.'
+
+        print(formatted_questions_list)
+        
+        # Formatting topics with their confidence scores
+        formatted_topics_list = [f"{t['topic']} (Confidence: {t['confidence']})" for t in topics]
+        formatted_topics = f"{num_topics} topics identified: {', '.join(formatted_topics_list)}" if topics else 'No topics identified.'
+        
+        if questions:
+            parser_response_data['questions'] = questions
+
+        parser_response_data['function_response'] = f"{formatted_questions}\n{formatted_topics}"
 
         return
 
@@ -439,13 +443,16 @@ class AnswererChatSession:
     def __init__(self, initial_system_message=answerer_system_message, temperature=0.5): 
 
         self.temperature = temperature
-        # self.functions= [
-        #     # TODO: Add answerer functions for calculator, internet lookup
-        #     # |------ Answerer Functions ------|
-            
-        #     {
-        #     }
-        # ]
+        self.functions= [
+            {
+                "name": "duplicate_question",
+                "description": "Call this if the questions is essentially the same as any question in chat history",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        ]
 
     def get_model_name(self):
         if self.CurrentAISmartsLevel == AISmartsLevel.gpt3:
@@ -509,8 +516,8 @@ class AnswererChatSession:
                     response = openai.ChatCompletion.create(
                         model=self.get_model_name(),
                         messages=self.history,
-                        # functions= self.functions,
-                        # function_call="auto",
+                        functions= self.functions,
+                        function_call="auto",
                         temperature=self.temperature
                     )
                 Print_And_Log('OpenAI responded successfully')
@@ -551,7 +558,8 @@ class AnswererChatSession:
             response_data['function_response'] += generated_message
 
         if finish_reason == "function_call":
-            #Todo: Deal with answerer functions
+            print("Answerer found a duplicate question")
+            response_data['chat_response'] = "" #Only function right now is "duplicate_question"
             pass
 
         else:            
