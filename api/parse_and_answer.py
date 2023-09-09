@@ -53,8 +53,7 @@ You are a conversation augmentation intelligence.  You listen to conversations b
 
 You will recieve snippets of text that have been transcribed from conversations.  
 Sometimes this text will be broken or mis-transcribed, so when interpretting this text, consider similar-sounding and rhyming words instead of the words at hand if something doesn't quite make sense.
-You will always respond with function calls, instead of assistant messages.  One call is for questions raised, another is for topics of interest.
-
+Punctuation can also be missing or misleading, as this is a transcription.  Pay most attention to the words.
 """
 
 answerer_system_message = """
@@ -240,17 +239,10 @@ def Call_LLMs_Series(prompt: str, temperature: float, top_level_response_data: d
         else:  
             Print_And_Log('Using existing chat session for answerer')  
 
-        #This runs in serial:
-
-        # # Send each question to answerer_chat_session.chat and format the response.
-        # for question in parser_response_data['questions']:
-        #     answerer_response_data = {"chat_response": "", "function_response": "", "user_exit": False}
-        #     answerer_chat_session.chat(question, answerer_response_data, True)
-
-        #     # Append the question and its corresponding answer to the list.
-        #     top_level_response_data['qna_pairs'].append({"question": question, "answer": answerer_response_data['chat_response']})
-
         #This runs in parallel:
+
+        # Filter out questions with confidence score <= 2
+        high_confidence_questions = [q['question'] for q in parser_response_data['questions'] if q['confidence'] > 2]
 
         # Function to call the answerer
         def call_answerer(question):
@@ -258,11 +250,11 @@ def Call_LLMs_Series(prompt: str, temperature: float, top_level_response_data: d
             answerer_chat_session.chat(question, answerer_response_data, True)
             return {"question": question, "answer": answerer_response_data['chat_response']}
 
-        # Parallelize the answerer function calls
-        questions = parser_response_data['questions']
+        # Parallelize the answerer function calls with high-confidence questions
         with ThreadPoolExecutor() as executor:
-            qna_pairs = list(executor.map(call_answerer, questions))
+            qna_pairs = list(executor.map(call_answerer, high_confidence_questions))
             
+        # Extend the qna_pairs only with high-confidence questions and answers
         top_level_response_data['qna_pairs'].extend(qna_pairs)
 
         # TODO Rebuild the conversation history with question (user) and answer (assistant) pairs that happened in parallel.
@@ -295,23 +287,36 @@ class ParserChatSession:
             
             {
                 "name": "parse_questions_and_topics",
-                "description": "Return the questions and topics the conversation snippet might be about.  These are mutually exclusive - if you list one idea as a question, don't also list it as a topic.",
+                "description": "Return the questions and topics the conversation snippet might be about. These are mutually exclusive - if you list one idea as a question, don't also list it as a topic. Each should be rated on a scale of 1-5 with how confident you are that this question or topic is being asked about.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "questions": {
-                            "type": "array",  # Changed to array
-                            "description": "questions relevant to the conversation, formatted with proper grammar ending in '?'",
-                            "items": {"type": "string"}
-                        },
-                        "topics": {
-                            "type": "array",  # Changed to array
-                            "description": "topics the conversation is about, 3 word max",
-                            "items": {"type": "string"}
+                            "type": "array",
+                            "description": "Questions relevant to the conversation, formatted with proper grammar ending in '?'.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "question": {"type": "string"},
+                                    "confidence": {"type": "number"}
+                                }
+                                }
+                            },
+                            "topics": {
+                                "type": "array",
+                                "description": "Topics the conversation is about, 3-word max.",
+                                "items": {
+                                "type": "object",
+                                "properties": {
+                                    "topic": {"type": "string"},
+                                    "confidence": {"type": "number"}
+                                }
+                            }
                         }
                     }
                 }
-            },            
+            }
+    
         ]
     
     def get_model_name(self):
@@ -335,23 +340,25 @@ class ParserChatSession:
         retry_wait_time = 12
 
         for attempt in range(max_retries):
+            
+            if use_test_data:
+                response = simulated_parser_multiple_questions_response
+                pass
+            else:
+                response = openai.ChatCompletion.create(
+                    model=self.get_model_name(),
+                    messages=self.history,
+                    functions= self.functions,
+                    function_call="always",
+                    temperature=self.temperature
+                )
+            Print_And_Log('OpenAI responded successfully')   
+            Print_And_Log(response)            
+            self.parse_functions(response, parser_response_data)
+            return
             try:
+                pass
                 
-                if use_test_data:
-                    response = simulated_parser_multiple_questions_response
-                    pass
-                else:
-                    response = openai.ChatCompletion.create(
-                        model=self.get_model_name(),
-                        messages=self.history,
-                        functions= self.functions,
-                        function_call="auto",
-                        temperature=self.temperature
-                    )
-                Print_And_Log('OpenAI responded successfully')   
-                Print_And_Log(response)            
-                self.parse_functions(response, parser_response_data)
-                return
             except openai.error.RateLimitError as e:
                 Print_And_Log(f"RateLimitError: {e}")
                 time.sleep(retry_wait_time)
@@ -395,11 +402,21 @@ class ParserChatSession:
                 num_questions = len(questions)
                 num_topics = len(topics)
                 
-                formatted_questions = f"{num_questions} questions generated: {', '.join(questions)}" if questions else 'No questions identified.'
-                formatted_topics = f"{num_topics} topics identified: {', '.join(topics)}" if topics else 'No topics identified.'
+                print(type(questions))
+                print(questions)
+
+                 # Formatting questions with their confidence scores
+                formatted_questions_list = [f"{q['question']} (Confidence: {q['confidence']})" for q in questions]
+                formatted_questions = f"{num_questions} questions generated: {', '.join(formatted_questions_list)}" if questions else 'No questions identified.'
+
+                print(formatted_questions_list)
+                
+                # Formatting topics with their confidence scores
+                formatted_topics_list = [f"{t['topic']} (Confidence: {t['confidence']})" for t in topics]
+                formatted_topics = f"{num_topics} topics identified: {', '.join(formatted_topics_list)}" if topics else 'No topics identified.'
                 
                 if questions:
-                    parser_response_data['questions'] = arguments_json.get('questions', [])
+                    parser_response_data['questions'] = questions
         
                 parser_response_data['function_response'] = f"{formatted_questions}\n{formatted_topics}"
 
