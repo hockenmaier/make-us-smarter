@@ -66,7 +66,7 @@ You are a conversation augmentation intelligence.  You are working in tandem wit
 
 When you receive a question, your job is to answer it as concisely as possible.  Try to answer in one sentence if possible.  Participants in the conversation will briefly see each of your answers and need to react to them quickly.
 
-Always start with the most pertinent part of the answer.
+Always start with the most pertinent part of the answer.  Only answer questions you know the answer to for sure.
 
 If you recieve a duplicate question, call the function.
 """
@@ -403,7 +403,7 @@ class ParserChatSession:
             parser_response_data['function_response'] += generated_message
             return
 
-        print(f"💭 The snippet seems to have questions or topics")
+        print(f"The snippet seems to have questions or topics")
         #TODO: format questions and topics into parser_response_data['function_response']
         questions = arguments_json.get('questions', [])
         topics = arguments_json.get('topics', [])
@@ -532,7 +532,7 @@ class AnswererChatSession:
                     if (self.CurrentAISmartsLevel == AISmartsLevel.gpt3 and self.CurrentAIContextLength < GPT3Lengths.medium) or \
                         (self.CurrentAISmartsLevel == AISmartsLevel.gpt4 and self.CurrentAIContextLength < GPT4Lengths.medium):
                             self.CurrentAIContextLength = GPT3Lengths(self.CurrentAIContextLength.value + 1) if self.CurrentAISmartsLevel == AISmartsLevel.gpt3 else GPT4Lengths(self.CurrentAIContextLength.value + 1)
-                            print("⚙️ Switched to:", GPT3_Models[self.CurrentAIContextLength] if self.CurrentAISmartsLevel == AISmartsLevel.gpt3 else GPT4_Models[self.CurrentAIContextLength])
+                            print("Switched to:", GPT3_Models[self.CurrentAIContextLength] if self.CurrentAISmartsLevel == AISmartsLevel.gpt3 else GPT4_Models[self.CurrentAIContextLength])
                             # Continue with the new context length
                     else:
                         print("Max content length hit.  Trimming history so that it starts with the second-earliest user message")

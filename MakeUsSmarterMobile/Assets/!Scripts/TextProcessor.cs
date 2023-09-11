@@ -22,10 +22,13 @@ public class TextProcessor : MonoBehaviour
     private string cumulativeText = "";
     private string currentRecording = "";
     private string lastChunkEnd = "";
+    int chunkCount = 0;  // New variable to keep track of the number of chunks
+    int lastSentMarker = -1;  // New variable to keep track of the last sent marker
+
 
     private string speechPrompt = "...";
 
-    private float chunkingTime = 12f;
+    private float chunkingTime = 5f;
 
     private void Awake()
     {
@@ -125,20 +128,38 @@ public class TextProcessor : MonoBehaviour
         currentRecording = ""; // Reset current recording to ensure no duplicates
         previewText.text = cumulativeText + speechPrompt;
         StartRecording(); // Restart the recording
-        SendTextSnippet(result);
+        //SendTextSnippet(result);  //Do this in ChunkText() now
     }
 
-    public void ChunkText()
+    /*public void ChunkText()
     {
         string newText = cumulativeText.Substring(lastChunkEnd.Length) + currentRecording;
         cumulativeText += newText + "|"; // Append new text and a bar to delineate chunks
         lastChunkEnd = cumulativeText; // Update the last chunk end marker
-        /*if (newText.Length > 15)
-        {
-            SendTextSnippet(newText);
-        }*/
-    }
+    }*/
 
+    public void ChunkText()
+    {
+        string newText = cumulativeText.Substring(lastChunkEnd.Length) + currentRecording;
+
+        if (newText.Length >= 50)  // Check if the chunk has at least 50 characters
+        {
+            cumulativeText += newText + "|";  // Append new text and a bar to delineate chunks
+            lastChunkEnd = cumulativeText;  // Update the last chunk end marker
+            chunkCount++;  // Increment chunk count
+
+            if (chunkCount % 2 == 0)  // Check if two chunks have been added
+            {
+                // Extract the chunks to be sent and send them
+                string[] allChunks = cumulativeText.Split('|');
+                int start = (lastSentMarker >= 0) ? lastSentMarker : 0;
+                string chunksToSend = string.Join("|", allChunks, start, allChunks.Length - start);
+                SendTextSnippet(chunksToSend);  // Assuming you have a function to send these to your API
+
+                lastSentMarker = allChunks.Length - 1;  // Update the last sent marker
+            }
+        }
+    }
 
     public void OnAvailabilityChange(bool available)
     {
